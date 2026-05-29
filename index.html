@@ -240,6 +240,31 @@
             50% { background-position: 100% 50%; }
             100% { background-position: 0% 50%; }
         }
+        /* Labels de océanos: texto azul itálico, semitransparente, sobre el agua */
+        .ocean-label {
+            font-family: 'Quicksand', sans-serif;
+            font-weight: 700;
+            font-style: italic;
+            color: #1e3a8a;
+            opacity: 0.55;
+            text-shadow:
+                0 1px 2px rgba(255,255,255,0.9),
+                0 -1px 2px rgba(255,255,255,0.9),
+                1px 0 2px rgba(255,255,255,0.9),
+                -1px 0 2px rgba(255,255,255,0.9),
+                0 0 8px rgba(255,255,255,0.7);
+            letter-spacing: 0.08em;
+            pointer-events: none;
+            user-select: none;
+            white-space: nowrap;
+            font-size: 22px;
+            transform: translate(-50%, -50%);
+            display: inline-block;
+        }
+        .ocean-label--small {
+            font-size: 14px;
+            opacity: 0.5;
+        }
         /* Pusheen SVG en el display grande de la columna izquierda — se adapta al espacio */
         #pusheen-big-display svg {
             width: auto !important;
@@ -661,6 +686,9 @@
             mapTiles.voyagerNoLabels = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager_nolabels/{z}/{x}/{y}{r}.png', {
                 maxZoom: 19
             }).addTo(map);
+
+            // Etiquetas de océanos y mares para orientación
+            addOceanLabels();
 
             // Descargar límites fronterizos (GeoJSON) reales del mundo
             fetchGeoJsonBorders();
@@ -1127,6 +1155,23 @@
             void wrapper.offsetWidth;
             wrapper.classList.add('flash-error');
             setTimeout(() => wrapper.classList.remove('flash-error'), 1000);
+        }
+
+        // Etiquetas de océanos y mares — labels estáticos para orientación geográfica
+        function addOceanLabels() {
+            const oceans = [
+                { name: 'Océano<br>Pacífico', coords: [-5, -110], cls: '' },
+                { name: 'Océano<br>Atlántico', coords: [6, -42], cls: '' }
+            ];
+            oceans.forEach(o => {
+                const icon = L.divIcon({
+                    className: '',
+                    html: `<div class="ocean-label ${o.cls}" style="text-align:center;">${o.name}</div>`,
+                    iconSize: [0, 0],
+                    iconAnchor: [0, 0]
+                });
+                L.marker(o.coords, { icon, interactive: false, keyboard: false }).addTo(map);
+            });
         }
 
         // Marcador estrella en la ubicación de la capital (durante el quiz)
