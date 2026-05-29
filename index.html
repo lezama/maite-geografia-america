@@ -1,0 +1,1736 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="description" content="Juego educativo de geografía de América para niños. Aprendé los 28 países y sus capitales junto a Pusheen el gato. Hecho con ❤️ para Maite.">
+    <meta name="theme-color" content="#ec4899">
+    <meta property="og:title" content="¡América con Maite! 🌍🐱">
+    <meta property="og:description" content="Juego para aprender la geografía de América. Hecho con ❤️ para Maite.">
+    <meta property="og:type" content="website">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🐱</text></svg>">
+    <title>¡América con Maite! 🌍🐱</title>
+    <!-- Tailwind CSS para diseño responsivo y moderno -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Leaflet CSS para el mapa interactivo real -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <!-- Fuente Google Fonts de estilo amigable e infantil -->
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Quicksand:wght@400;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        html, body {
+            min-height: 100svh; /* Small viewport height — siempre cabe aunque el chrome de Safari esté visible */
+        }
+        body {
+            font-family: 'Quicksand', sans-serif;
+            background: linear-gradient(135deg, #fdf2f8 0%, #f0f4f8 100%);
+            user-select: none;
+            -webkit-text-size-adjust: 100%;
+            overscroll-behavior: contain; /* No bounce raro en iOS al llegar al borde */
+        }
+        .title-font {
+            font-family: 'Fredoka One', cursive;
+        }
+        /* Mapa: flex-1 dentro de la sección, llena todo el alto disponible */
+        .map-wrapper {
+            position: relative;
+            width: 100%;
+            flex: 1 1 0;
+            min-height: 240px;
+        }
+        /* Landscape corto (iPad con Safari chrome): compactar la columna izquierda para dar más espacio al mapa */
+        @media (max-height: 820px) and (orientation: landscape) {
+            .map-wrapper { min-height: 200px; }
+            main { padding-top: 4px !important; padding-bottom: 4px !important; gap: 8px !important; }
+            main > section:first-child > div:first-child { padding: 8px !important; }
+            main > section:first-child > div:first-child h2 { font-size: 12px !important; margin-bottom: 4px !important; }
+            main > section:first-child > div:first-child > div:first-child > div:nth-child(2) {
+                padding: 6px !important; margin-top: 4px !important; margin-bottom: 4px !important;
+            }
+            main > section:first-child > div:first-child #find-target-flag { font-size: 28px !important; margin: 0 !important; }
+            main > section:first-child > div:first-child #find-target-name { font-size: 18px !important; line-height: 1.1 !important; }
+            main > section:first-child > div:first-child #find-instruction-text { display: none !important; }
+            main > section:first-child > div:first-child button#btn-hint { padding: 4px !important; font-size: 10px !important; }
+            main > section:first-child > div:first-child > div:last-child > div:last-child {
+                padding: 4px !important; margin-top: 4px !important;
+            }
+            main > section:first-child > div:first-child #tuki-speech {
+                font-size: 9px !important; line-height: 1.2 !important;
+                display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+            }
+            main > section:first-child > div:nth-child(2) { padding: 6px !important; }
+            main > section:first-child > div:nth-child(2) h3 { font-size: 10px !important; }
+            main > section:first-child > div:nth-child(2) span,
+            main > section:first-child > div:nth-child(2) p { font-size: 9px !important; line-height: 1.1; }
+            main > section:first-child > div:nth-child(2) #find-streak,
+            main > section:first-child > div:nth-child(2) #best-streak { font-size: 14px !important; }
+        }
+        /* iPad y similares: footer oculto; safe-area para home indicator */
+        @media (min-width: 768px) and (max-width: 1279px) {
+            body { padding-bottom: env(safe-area-inset-bottom, 0); }
+            main { min-height: 0; }
+            footer.app-footer { display: none; }
+        }
+        /* Móvil: dejar scroll normal (necesario porque entra apenas) */
+        @media (max-width: 767px) {
+            footer.app-footer { padding: 6px 8px; font-size: 10px; }
+            footer.app-footer .footer-tag { display: none; }
+        }
+        #leaflet-map {
+            height: 100%;
+            width: 100%;
+            border-radius: 1.5rem;
+            box-shadow: inset 0 0 15px rgba(0,0,0,0.08);
+            z-index: 10;
+        }
+        /* Animación suave para la mascota y Pusheen */
+        .bounce-gentle {
+            animation: bounce-gentle 2s infinite ease-in-out;
+        }
+        @keyframes bounce-gentle {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-8px); }
+        }
+        /* Animación de giro feliz para Pusheen */
+        .pusheen-spin {
+            animation: pusheen-spin 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        @keyframes pusheen-spin {
+            0% { transform: scale(0.5) rotate(-45deg); opacity: 0; }
+            50% { transform: scale(1.1) rotate(10deg); }
+            100% { transform: scale(1) rotate(0); opacity: 1; }
+        }
+        /* Animación de baile para Pusheen */
+        .pusheen-dance {
+            animation: pusheen-dance 0.8s infinite alternate ease-in-out;
+        }
+        @keyframes pusheen-dance {
+            0% { transform: rotate(-4deg) scaleY(0.97); }
+            100% { transform: rotate(4deg) scaleY(1.03); }
+        }
+        /* Diseños de Pines interactivos de banderas reveladas */
+        .custom-flag-pin {
+            background: white;
+            border: 3px solid #b5a8a1; /* Color gris Pusheen */
+            border-radius: 50%;
+            width: 48px !important;
+            height: 48px !important;
+            margin-left: -24px !important;
+            margin-top: -24px !important;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            box-shadow: 0 6px 14px rgba(0,0,0,0.2);
+            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            animation: pin-pop 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+        }
+        @keyframes pin-pop {
+            0% { transform: scale(0); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        /* Pin objetivo latiendo en verde */
+        .target-pin-pulse-success {
+            animation: pin-pulse-green 1.2s infinite alternate;
+            border-color: #10b981;
+        }
+        @keyframes pin-pulse-green {
+            0% { transform: scale(1); box-shadow: 0 0 5px rgba(16, 185, 129, 0.5); }
+            100% { transform: scale(1.15); box-shadow: 0 0 20px rgba(16, 185, 129, 1); }
+        }
+        /* Pin de error latiendo en rojo */
+        .target-pin-pulse-error {
+            animation: pin-pulse-red 1s infinite alternate;
+            border-color: #ef4444;
+            background: #fee2e2;
+        }
+        @keyframes pin-pulse-red {
+            0% { transform: scale(1); box-shadow: 0 0 5px rgba(239, 68, 68, 0.5); }
+            100% { transform: scale(1.1); box-shadow: 0 0 15px rgba(239, 68, 68, 0.9); }
+        }
+        /* Controles Leaflet de zoom personalizados */
+        .leaflet-bar a {
+            background-color: #ffffff !important;
+            color: #ec4899 !important;
+            border: none !important;
+            font-family: 'Fredoka One', sans-serif !important;
+            border-radius: 8px !important;
+            margin-bottom: 2px;
+        }
+        /* Banner de reveal cuando se equivoca */
+        .reveal-banner {
+            position: absolute;
+            bottom: 12px;
+            left: 50%;
+            transform: translateX(-50%) translateY(20px);
+            z-index: 1100;
+            background: linear-gradient(135deg, #10b981, #059669);
+            color: white;
+            font-family: 'Fredoka One', cursive;
+            padding: 10px 20px;
+            border-radius: 999px;
+            box-shadow: 0 8px 25px rgba(16, 185, 129, 0.45);
+            border: 3px solid white;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.35s ease, transform 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            max-width: 90%;
+            text-align: center;
+            font-size: 16px;
+            line-height: 1.25;
+        }
+        .reveal-banner.show {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+        }
+        @media (max-height: 700px) and (orientation: landscape) {
+            .reveal-banner { bottom: 6px; font-size: 12px; padding: 6px 12px; }
+            .reveal-banner .reveal-flag { font-size: 18px; }
+        }
+        .reveal-banner .reveal-flag {
+            font-size: 28px;
+            vertical-align: middle;
+            margin: 0 4px;
+        }
+        .reveal-banner .reveal-small {
+            display: block;
+            font-family: 'Quicksand', sans-serif;
+            font-weight: 700;
+            font-size: 11px;
+            opacity: 0.95;
+            margin-top: 2px;
+        }
+        @media (max-width: 640px) {
+            .reveal-banner { font-size: 13px; padding: 8px 14px; top: 8px; }
+            .reveal-banner .reveal-flag { font-size: 22px; }
+        }
+        /* Check persistente sobre países ya adivinados */
+        .guessed-check {
+            background: white;
+            border: 3px solid #16a34a;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #16a34a;
+            font-weight: bold;
+            font-size: 16px;
+            box-shadow: 0 3px 10px rgba(22, 163, 74, 0.45);
+            animation: check-pop 0.55s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        @keyframes check-pop {
+            0% { transform: scale(0) rotate(-180deg); opacity: 0; }
+            60% { transform: scale(1.25) rotate(15deg); }
+            100% { transform: scale(1) rotate(0); opacity: 1; }
+        }
+        /* Celebración final cuando completa todo el continente */
+        .completion-bg {
+            background: linear-gradient(135deg, #fbbf24, #f59e0b, #ec4899, #a855f7);
+            background-size: 300% 300%;
+            animation: completion-gradient 4s ease infinite;
+        }
+        @keyframes completion-gradient {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+        /* Pusheen SVG en el display grande de la columna izquierda — se adapta al espacio */
+        #pusheen-big-display svg {
+            width: auto !important;
+            height: 100% !important;
+            max-width: 100% !important;
+            max-height: 180px !important;
+            object-fit: contain;
+        }
+        /* Marcador de capital en el mapa durante el quiz */
+        .capital-marker {
+            background: linear-gradient(135deg, #fbbf24, #f59e0b);
+            border: 3px solid white;
+            border-radius: 50%;
+            width: 40px !important;
+            height: 40px !important;
+            margin-left: -20px !important;
+            margin-top: -20px !important;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            box-shadow: 0 4px 14px rgba(245, 158, 11, 0.55);
+            animation: capital-pulse 1.4s infinite;
+        }
+        @keyframes capital-pulse {
+            0%, 100% { transform: scale(1); box-shadow: 0 4px 14px rgba(245, 158, 11, 0.55); }
+            50% { transform: scale(1.18); box-shadow: 0 6px 22px rgba(245, 158, 11, 0.9); }
+        }
+        .capital-marker::after {
+            content: '';
+            position: absolute;
+            top: -8px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 0; height: 0;
+            border-left: 6px solid transparent;
+            border-right: 6px solid transparent;
+            border-bottom: 8px solid #f59e0b;
+        }
+        /* Quiz de capital: botones grandes y claros */
+        .capital-option {
+            background: white;
+            border: 3px solid #e2e8f0;
+            padding: 10px 12px;
+            border-radius: 16px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-align: center;
+            font-size: 14px;
+            color: #475569;
+            min-height: 44px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+        .capital-option:not(:disabled):hover {
+            border-color: #ec4899;
+            background: #fdf2f8;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(236, 72, 153, 0.15);
+        }
+        .capital-option.correct {
+            background: linear-gradient(135deg, #d1fae5, #a7f3d0);
+            border-color: #10b981;
+            color: #065f46;
+            animation: cap-correct-pulse 0.6s ease;
+        }
+        .capital-option.wrong-pick {
+            background: linear-gradient(135deg, #fee2e2, #fca5a5);
+            border-color: #ef4444;
+            color: #991b1b;
+            animation: cap-wrong-shake 0.4s ease;
+        }
+        @keyframes cap-correct-pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+        @keyframes cap-wrong-shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-6px); }
+            75% { transform: translateX(6px); }
+        }
+        /* Flash de error: borde rojo pulsando en el mapa cuando se equivoca */
+        .map-wrapper.flash-error::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            border-radius: 1rem;
+            box-shadow: inset 0 0 0 6px rgba(239, 68, 68, 0.7);
+            animation: flash-error-fade 0.9s ease-out;
+            z-index: 1050;
+        }
+        @keyframes flash-error-fade {
+            0% { opacity: 1; }
+            100% { opacity: 0; }
+        }
+    </style>
+</head>
+<body class="text-slate-800 flex flex-col">
+
+    <main class="max-w-7xl mx-auto p-2 md:p-3 flex-grow w-full grid grid-cols-1 md:grid-cols-12 md:grid-rows-[1fr] gap-3 md:gap-4 items-stretch min-h-0">
+
+        <!-- COLUMNA IZQUIERDA: Todo el contenido (header, target, rachas, stats) -->
+        <section class="md:col-span-5 lg:col-span-4 flex flex-col gap-2 md:gap-3 min-h-0">
+
+            <!-- TARJETA DE CONTROL: título, voz, estrellas, reset, tile selector, stats -->
+            <div class="bg-white p-2 md:p-3 rounded-3xl shadow-xl border-4 border-pink-100 flex flex-col gap-2">
+                <!-- Fila 1: Logo + Título + Voz + Estrellas + Reiniciar -->
+                <div class="flex items-center justify-between gap-1.5 flex-wrap">
+                    <div class="flex items-center gap-1.5 min-w-0">
+                        <div class="w-7 h-7 md:w-8 md:h-8 flex items-center justify-center bg-pink-100 rounded-full bounce-gentle text-base md:text-lg flex-shrink-0">🐱</div>
+                        <h1 class="text-xs md:text-sm lg:text-base title-font text-pink-500 tracking-wide leading-tight">¡América con Maite! 🌍</h1>
+                    </div>
+                    <div class="flex items-center gap-1">
+                        <button id="btn-voice" onclick="toggleVoice()" class="flex items-center gap-1 bg-slate-300 hover:bg-slate-400 text-slate-700 font-bold px-2 py-1 rounded-full shadow-md transition-all text-[10px] md:text-xs min-h-[28px]" title="Activar/desactivar voz">
+                            <span id="voice-icon">🔇</span>
+                            <span id="voice-status" class="hidden">Voz</span>
+                        </button>
+                        <div class="bg-pink-50 border-2 border-pink-200 rounded-full px-2 py-0.5 flex items-center gap-0.5 font-bold text-pink-700 text-[10px] md:text-xs">
+                            <span>⭐</span>
+                            <span id="score-counter" class="text-xs md:text-sm text-amber-500 font-extrabold">0</span>
+                        </div>
+                        <button onclick="confirmReset()" class="text-[9px] md:text-[10px] text-slate-400 hover:text-pink-500 font-bold underline transition-colors px-1">
+                            Reiniciar
+                        </button>
+                    </div>
+                </div>
+                <!-- Fila 2: Stats (progreso, hints, intentos) + Tile selector -->
+                <div class="flex items-center justify-between gap-1.5 flex-wrap text-[10px] md:text-[11px]">
+                    <div class="flex items-center gap-1 flex-wrap">
+                        <span class="bg-green-100 text-green-700 font-bold px-1.5 py-0.5 rounded-full border border-green-300">✓ <span id="progress-counter">0</span>/<span id="progress-total">28</span></span>
+                        <span class="bg-blue-50 text-blue-700 font-bold px-1.5 py-0.5 rounded-full border border-blue-200" title="Sin pista">💪 <span id="learned-no-hint">0</span></span>
+                        <span class="bg-amber-50 text-amber-700 font-bold px-1.5 py-0.5 rounded-full border border-amber-200" title="Con pista">💡 <span id="learned-with-hint">0</span></span>
+                        <span class="text-slate-500">Int: <span id="find-tries" class="font-bold text-slate-700">0</span></span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TARJETA PRINCIPAL: ¿Dónde está el país? -->
+            <div class="bg-white p-2 md:p-3 rounded-3xl shadow-xl border-4 border-pink-100 flex flex-col gap-1.5 flex-shrink-0">
+
+                <div class="text-center">
+                    <h2 class="text-xs md:text-sm title-font text-pink-500 flex items-center justify-center gap-1">
+                        🎯 ¡Maite, busca este país!
+                    </h2>
+
+                    <!-- Gran tarjeta del objetivo actual -->
+                    <div class="mt-1.5 bg-gradient-to-r from-pink-50 to-pink-100/60 border-2 border-pink-300 rounded-2xl p-1.5 md:p-2 shadow-inner relative">
+                        <span id="find-target-flag" class="text-3xl md:text-4xl block transition-transform duration-300 transform hover:scale-110">🌎</span>
+                        <span id="find-target-name" class="text-lg md:text-xl title-font text-pink-700 block tracking-wide leading-tight">-</span>
+                        <span id="hint-used-badge" class="hidden absolute top-1 right-1 bg-amber-200 text-amber-800 text-[9px] font-bold px-1.5 py-0.5 rounded-full border border-amber-400">💡 Pista usada</span>
+                    </div>
+                </div>
+
+                <!-- Botones y pistas (modo default: buscar país) -->
+                <div id="default-controls" class="space-y-1.5">
+                    <button id="btn-hint" onclick="giveHint()" class="w-full text-[11px] md:text-xs bg-amber-100 hover:bg-amber-200 text-amber-800 font-bold py-1.5 md:py-2 rounded-xl shadow-sm transition-all flex items-center justify-center gap-1.5">
+                        💡 Pedir pista a Tuki el Tucán
+                    </button>
+
+                    <!-- Consola Tuki interactiva reducida -->
+                    <div class="flex items-start gap-2 bg-slate-50 p-1.5 md:p-2 rounded-xl border border-slate-100">
+                        <span class="text-lg md:text-xl flex-shrink-0">🦜</span>
+                        <div class="text-left flex-1 min-w-0">
+                            <p id="tuki-speech" class="text-[10px] md:text-[11px] font-semibold text-slate-600 leading-snug line-clamp-2">
+                                ¡Busca en el mapa de la derecha! Tocá el país y luego elegí su capital.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Quiz de capital (modo: elegir capital) -->
+                <div id="capital-quiz" class="hidden space-y-2 md:space-y-3">
+                    <!-- Resumen del click (clickeado + correcto si erró) -->
+                    <div id="capital-quiz-context" class="text-[11px] md:text-xs bg-slate-50 border-2 border-slate-200 rounded-xl p-2 md:p-2.5 text-center leading-snug"></div>
+                    <p class="text-xs md:text-sm font-bold text-purple-700 text-center">
+                        ¿Cuál es la capital de <span id="capital-quiz-country" class="text-pink-600">-</span>?
+                    </p>
+                    <div class="grid grid-cols-1 gap-1.5 md:gap-2">
+                        <button class="capital-option" onclick="handleCapitalChoice(0)" id="cap-opt-0">-</button>
+                        <button class="capital-option" onclick="handleCapitalChoice(1)" id="cap-opt-1">-</button>
+                        <button class="capital-option" onclick="handleCapitalChoice(2)" id="cap-opt-2">-</button>
+                    </div>
+                    <p id="capital-feedback" class="text-[11px] md:text-xs text-center text-slate-600 font-semibold leading-snug min-h-[18px]"></p>
+                </div>
+            </div>
+
+            <!-- TARJETA DE PUSHEEN + RACHAS: ocupa el espacio sobrante con un Pusheen grande -->
+            <div class="bg-gradient-to-br from-purple-50 via-pink-50 to-purple-50 p-3 md:p-4 rounded-3xl shadow-xl border-4 border-purple-100 flex flex-col items-center gap-2 md:gap-3 flex-grow min-h-0 overflow-hidden">
+                <div class="w-full flex items-center justify-between">
+                    <h3 class="text-xs md:text-sm title-font text-purple-600 flex items-center gap-1">
+                        🔥 Rachas
+                    </h3>
+                    <span id="streak-badge" class="hidden text-[10px] md:text-xs font-bold px-2 py-0.5 rounded-full"></span>
+                </div>
+
+                <!-- Pusheen GRANDE animado que crece con la racha -->
+                <div id="pusheen-big-display" class="flex-grow w-full flex items-center justify-center min-h-0 overflow-hidden">
+                    <div class="leading-none animate-bounce select-none" style="font-size: clamp(48px, 9vh, 96px);">🐱</div>
+                </div>
+
+                <p id="pusheen-status-text" class="text-[11px] md:text-xs font-bold text-purple-700 text-center leading-tight px-1">¡Pusheen espera tu racha!</p>
+
+                <!-- Mini stats abajo -->
+                <div class="w-full grid grid-cols-2 gap-2">
+                    <div class="bg-white/70 rounded-xl p-1.5 text-center border border-purple-150">
+                        <span class="text-[9px] md:text-[10px] text-slate-500 font-bold block leading-none">🔥 Actual</span>
+                        <span id="find-streak" class="text-base md:text-lg font-extrabold text-pink-600 block leading-none mt-0.5">0</span>
+                    </div>
+                    <div class="bg-white/70 rounded-xl p-1.5 text-center border border-yellow-150">
+                        <span class="text-[9px] md:text-[10px] text-slate-500 font-bold block leading-none">👑 Máxima</span>
+                        <span id="best-streak" class="text-base md:text-lg font-extrabold text-amber-600 block leading-none mt-0.5">0</span>
+                    </div>
+                </div>
+            </div>
+
+        </section>
+
+        <!-- COLUMNA DERECHA: Solo el mapa -->
+        <section class="md:col-span-7 lg:col-span-8 bg-white p-1.5 md:p-2 rounded-3xl shadow-xl border-4 border-pink-100 flex flex-col min-h-0">
+
+            <!-- Contenedor del Mapa Leaflet -->
+            <div id="map-wrapper" class="map-wrapper rounded-2xl overflow-hidden border-4 border-slate-100">
+                <div id="leaflet-map"></div>
+
+                <!-- Banner de reveal de la respuesta correcta -->
+                <div id="reveal-banner" class="reveal-banner">
+                    <span id="reveal-label">¡El correcto era</span>
+                    <span id="reveal-flag" class="reveal-flag">🌎</span>
+                    <span id="reveal-name">país</span>!
+                    <span id="reveal-extra" class="reveal-small"></span>
+                </div>
+
+                <!-- Cargador flotante de GeoJSON -->
+                <div id="map-loader" class="absolute inset-0 bg-white/75 flex flex-col items-center justify-center z-[1000] pointer-events-none transition-opacity duration-500">
+                    <span class="text-5xl animate-bounce">🌍</span>
+                    <p class="text-sm font-bold text-slate-600 mt-2">Cargando el mapa real de América...</p>
+                    <p class="text-xs text-slate-400">Prepara las patitas, ¡Pusheen está listo!</p>
+                </div>
+            </div>
+
+        </section>
+
+    </main>
+
+    <!-- MODAL DE CELEBRACIÓN DE PUSHEEN POR RACHAS -->
+    <div id="pusheen-modal" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-[9999] flex items-center justify-center hidden p-4">
+        <div id="pusheen-modal-content" class="bg-white rounded-3xl p-6 max-w-sm w-full border-8 border-pink-300 text-center shadow-2xl relative transform scale-95 transition-all pusheen-spin">
+
+            <!-- Confeti flotante de decoración -->
+            <div class="absolute -top-12 left-1/2 transform -translate-x-1/2 text-7xl animate-bounce">
+                🎉
+            </div>
+
+            <h3 id="pusheen-congrats-title" class="text-2xl sm:text-3xl title-font text-pink-500 mt-4 mb-1">¡Racha Increíble!</h3>
+            <p id="pusheen-congrats-subtitle" class="text-sm font-bold text-purple-600 mb-4">¡Maite, lo estás haciendo genial!</p>
+
+            <!-- Ilustraciones de Pusheen vectorizadas de forma sumamente realista -->
+            <div id="pusheen-svg-container" class="bg-gradient-to-b from-pink-50 to-purple-50 rounded-2xl p-4 border-2 border-pink-100 mb-4 flex justify-center items-center h-48">
+                <!-- Se inyecta dinámicamente el Pusheen SVG realista -->
+            </div>
+
+            <div class="mb-4">
+                <span id="pusheen-streak-badge" class="bg-purple-100 text-purple-800 font-extrabold text-base px-4 py-1.5 rounded-full border border-purple-200">
+                    🔥 Racha de 3 aciertos
+                </span>
+            </div>
+
+            <p id="pusheen-fun-quote" class="text-xs text-slate-500 italic mb-5">
+                "¡A Pusheen le encantan las galletas tanto como a ti la geografía!"
+            </p>
+
+            <button onclick="closePusheenModal()" class="w-full bg-pink-500 hover:bg-pink-600 text-white font-bold py-3.5 rounded-2xl shadow-md transition-all text-sm tracking-wide">
+                ¡Seguir explorando! 🐾
+            </button>
+        </div>
+    </div>
+
+    <!-- MODAL ESPECIAL DE COMPLETACIÓN DEL CONTINENTE -->
+    <div id="completion-modal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-[9999] flex items-center justify-center hidden p-4">
+        <div class="completion-bg rounded-3xl p-6 md:p-8 max-w-lg w-full border-[10px] border-yellow-300 text-center shadow-2xl relative pusheen-spin">
+            <div class="absolute -top-14 left-1/2 transform -translate-x-1/2 text-7xl animate-bounce">🏆</div>
+            <h3 class="text-3xl md:text-5xl title-font text-white mt-6 mb-2 drop-shadow-lg">¡COMPLETASTE TODA AMÉRICA!</h3>
+            <p class="text-white font-bold mb-4 text-base md:text-lg drop-shadow">Maite, eres oficialmente <span class="bg-white text-pink-600 px-2 py-1 rounded-full">EXPERTA</span> del continente americano 🌎</p>
+
+            <div id="completion-pusheen-container" class="bg-white/30 rounded-2xl p-4 border-4 border-white mb-4 flex justify-center items-center min-h-[180px]"></div>
+
+            <div class="grid grid-cols-3 gap-2 md:gap-3 mb-2">
+                <div class="bg-white/90 p-2 rounded-2xl">
+                    <span class="text-2xl block">🌎</span>
+                    <span class="text-[10px] text-slate-500 font-bold">Países</span>
+                    <span id="completion-countries" class="text-xl font-extrabold text-green-600 block">0/0</span>
+                </div>
+                <div class="bg-white/90 p-2 rounded-2xl">
+                    <span class="text-2xl block">👑</span>
+                    <span class="text-[10px] text-slate-500 font-bold">Mejor Racha</span>
+                    <span id="completion-best-streak" class="text-xl font-extrabold text-amber-600 block">0</span>
+                </div>
+                <div class="bg-white/90 p-2 rounded-2xl">
+                    <span class="text-2xl block">⭐</span>
+                    <span class="text-[10px] text-slate-500 font-bold">Estrellas</span>
+                    <span id="completion-stars" class="text-xl font-extrabold text-pink-600 block">0</span>
+                </div>
+            </div>
+            <div class="grid grid-cols-2 gap-2 md:gap-3 mb-4">
+                <div class="bg-white/90 p-2 rounded-2xl">
+                    <span class="text-xl block">💪</span>
+                    <span class="text-[10px] text-slate-500 font-bold">Sin pista</span>
+                    <span id="completion-no-hint" class="text-lg font-extrabold text-blue-600 block">0</span>
+                </div>
+                <div class="bg-white/90 p-2 rounded-2xl">
+                    <span class="text-xl block">💡</span>
+                    <span class="text-[10px] text-slate-500 font-bold">Con pista</span>
+                    <span id="completion-with-hint" class="text-lg font-extrabold text-amber-600 block">0</span>
+                </div>
+            </div>
+
+            <button onclick="restartAfterCompletion()" class="w-full bg-white hover:bg-yellow-50 text-pink-600 font-extrabold py-3 md:py-4 rounded-2xl shadow-lg transition-all text-sm md:text-base tracking-wide">
+                🎉 ¡Jugar otra vez desde cero! 🎉
+            </button>
+        </div>
+    </div>
+
+    <!-- Mensaje modal de confirmación limpio -->
+    <div id="confirm-modal" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-[9999] flex items-center justify-center hidden p-4">
+        <div class="bg-white rounded-3xl p-6 max-w-xs w-full border-4 border-slate-300 text-center shadow-xl">
+            <span class="text-4xl">🔄</span>
+            <h3 class="text-lg title-font text-slate-700 mt-2 mb-2">¿Reiniciar juego?</h3>
+            <p class="text-xs text-slate-500 mb-4">Se borrarán tus estrellas, tus rachas y tus récords de hoy.</p>
+            <div class="flex gap-2">
+                <button onclick="resetGame()" class="flex-1 bg-red-400 hover:bg-red-500 text-white font-bold py-2 rounded-xl text-xs">Sí, reiniciar</button>
+                <button onclick="closeConfirmModal()" class="flex-1 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold py-2 rounded-xl text-xs">No, cancelar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Pie de página (oculto en tablet, mini en mobile) -->
+    <footer class="app-footer bg-slate-800 text-slate-400 text-xs text-center p-3 mt-4 border-t-2 border-slate-700">
+        <div class="max-w-7xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-2">
+            <p class="footer-tag">Hecho por <b class="text-pink-300">Maite</b> con Gemini Canvas + arreglos de su papá con Claude. 🌎🐾</p>
+            <p class="font-semibold text-slate-300"><a href="https://github.com/lezama/maite-geografia-america" class="hover:text-pink-300 underline">github.com/lezama/maite-geografia-america</a></p>
+        </div>
+    </footer>
+
+    <script>
+        // Base de datos de países americanos con sus coordenadas de precisión geográfica en el mapa real
+        const countriesData = {
+            "CA": { iso3: "CAN", name: "Canadá", capital: "Ottawa", capitalCoords: [45.4215, -75.6972], flag: "🇨🇦", region: "north", coords: [56.1304, -106.3468], zoom: 3, fact: "¡Es el país más helado de América! Tiene hermosos bosques nevados y allí viven osos polares, castores y alces reales." },
+            "US": { iso3: "USA", name: "Estados Unidos", capital: "Washington D.C.", capitalCoords: [38.9072, -77.0369], flag: "🇺🇸", region: "north", coords: [37.0902, -95.7129], zoom: 3.5, fact: "¡Es enorme! En el mapa de satélite verás grandes lagos y las famosas Montañas Rocosas, ¡y es el hogar de Disney!" },
+            "MX": { iso3: "MEX", name: "México", capital: "Ciudad de México", capitalCoords: [19.4326, -99.1332], flag: "🇲🇽", region: "north", coords: [23.6345, -102.5528], zoom: 4.5, fact: "¡Cuna del chocolate original, las pirámides antiguas de los mayas y los tacos! Verás desiertos al norte y selvas al sur." },
+            "GT": { iso3: "GTM", name: "Guatemala", capital: "Ciudad de Guatemala", capitalCoords: [14.6349, -90.5069], flag: "🇬🇹", region: "central", coords: [15.7835, -90.2308], zoom: 6.5, fact: "Su nombre significa 'tierra de muchos árboles'. Tiene volcanes increíbles e impresionantes tucanes de colores." },
+            "BZ": { iso3: "BLZ", name: "Belice", capital: "Belmopán", capitalCoords: [17.2510, -88.7590], flag: "🇧🇿", region: "central", coords: [17.1899, -88.4976], zoom: 7.5, fact: "¡Tiene un ojo azul gigante de agua en medio del mar que se puede ver claramente desde el espacio con el mapa satelital!" },
+            "SV": { iso3: "SLV", name: "El Salvador", capital: "San Salvador", capitalCoords: [13.6929, -89.2182], flag: "🇸🇻", region: "central", coords: [13.7942, -88.8965], zoom: 7.5, fact: "Es el país más pequeñito de Centroamérica, famoso por sus preciosos lagos dentro de cráteres volcánicos." },
+            "HN": { iso3: "HND", name: "Honduras", capital: "Tegucigalpa", capitalCoords: [14.0723, -87.1921], flag: "🇭🇳", region: "central", coords: [15.2000, -86.2419], zoom: 6.5, fact: "¡Tiene hermosas selvas donde vuela libre la guacamaya roja con sus plumas de mil colores!" },
+            "NI": { iso3: "NIC", name: "Nicaragua", capital: "Managua", capitalCoords: [12.1140, -86.2362], flag: "🇳🇮", region: "central", coords: [12.8654, -85.2072], zoom: 6.5, fact: "¡Tiene un lago de agua dulce tan inmenso que en él viven tiburones de verdad! Es algo único en el mundo." },
+            "CR": { iso3: "CRI", name: "Costa Rica", capital: "San José", capitalCoords: [9.9281, -84.0907], flag: "🇨🇷", region: "central", coords: [9.7489, -83.7534], zoom: 7.5, fact: "Su lema es 'Pura Vida' porque está cubierto de increíbles reservas naturales llenas de osos perezosos y simpáticas ranitas verdes." },
+            "PA": { iso3: "PAN", name: "Panamá", capital: "Ciudad de Panamá", capitalCoords: [8.9824, -79.5199], flag: "🇵🇦", region: "central", coords: [8.5380, -80.7821], zoom: 7.5, fact: "¡Aquí se divide la tierra en dos! Tienen un gigantesco canal para que los barcos reales crucen de un océano al otro." },
+            "CU": { iso3: "CUB", name: "Cuba", capital: "La Habana", capitalCoords: [23.1136, -82.3666], flag: "🇨🇺", region: "central", coords: [21.5218, -77.7812], zoom: 6.5, fact: "Es la isla más grande del Caribe. Tiene playas caribeñas hermosas y autos clásicos de colores súper antiguos en las calles." },
+            "JM": { iso3: "JAM", name: "Jamaica", capital: "Kingston", capitalCoords: [17.9772, -76.7674], flag: "🇯🇲", region: "central", coords: [18.1096, -77.2975], zoom: 8, fact: "¡La hermosa isla tropical de la música alegre, el reggae y cuna de los corredores más rápidos de la historia!" },
+            "HT": { iso3: "HTI", name: "Haití", capital: "Puerto Príncipe", capitalCoords: [18.5944, -72.3074], flag: "🇭🇹", region: "central", coords: [18.9712, -72.2852], zoom: 8, fact: "Comparte la gran Isla de la Española y posee castillos históricos asombrosos construidos en las montañas." },
+            "DO": { iso3: "DOM", name: "República Dominicana", capital: "Santo Domingo", capitalCoords: [18.4861, -69.9312], flag: "🇩🇴", region: "central", coords: [18.7357, -70.1627], zoom: 8, fact: "¡Famoso por sus playas de cocoteros blancos! Aquí nacieron ritmos súper alegres como el merengue." },
+            "PR": { iso3: "PRI", name: "Puerto Rico", capital: "San Juan", capitalCoords: [18.4655, -66.1057], flag: "🇵🇷", region: "central", coords: [18.2208, -66.5901], zoom: 8, fact: "La llaman la 'Isla del Encanto'. Tiene una ranita súper pequeña llamada coquí que canta por las noches." },
+            "CO": { iso3: "COL", name: "Colombia", capital: "Bogotá", capitalCoords: [4.7110, -74.0721], flag: "🇨🇴", region: "south", coords: [4.5709, -74.2973], zoom: 4.5, fact: "¡Es el país de las flores y del café delicioso! Tiene la mayor cantidad de especies de aves diferentes de todo el planeta." },
+            "VE": { iso3: "VEN", name: "Venezuela", capital: "Caracas", capitalCoords: [10.4806, -66.9036], flag: "🇻🇪", region: "south", coords: [6.4238, -66.5897], zoom: 4.5, fact: "Tiene la caída de agua más alta y majestuosa del mundo: ¡el Salto Ángel, oculto en una selva misteriosa!" },
+            "GY": { iso3: "GUY", name: "Guyana", capital: "Georgetown", capitalCoords: [6.8013, -58.1551], flag: "🇬🇾", region: "south", coords: [4.8604, -58.9302], zoom: 5.5, fact: "Casi todo su territorio son selvas vírgenes y cascadas donde habitan jaguares y nutrias gigantes." },
+            "SR": { iso3: "SUR", name: "Surinam", capital: "Paramaribo", capitalCoords: [5.8520, -55.2038], flag: "🇸🇷", region: "south", coords: [3.9193, -56.0278], zoom: 5.5, fact: "¡Es el país más pequeñito de Sudamérica! Su territorio es puro bosque tropical y se habla holandés." },
+            "GF": { iso3: "GUF", name: "Guayana Francesa", capital: "Cayena", capitalCoords: [4.9333, -52.3333], flag: "🇬🇫", region: "south", coords: [3.9339, -53.1258], zoom: 6, fact: "¡Es un pedacito de Francia en Sudamérica! Desde allí lanzan los cohetes Ariane al espacio. Se habla francés y usan el euro." },
+            "EC": { iso3: "ECU", name: "Ecuador", capital: "Quito", capitalCoords: [-0.1807, -78.4678], flag: "🇪🇨", region: "south", coords: [-1.8312, -78.1834], zoom: 5.5, fact: "Se llama así porque la línea ecuatorial del planeta pasa justo por aquí. ¡Tiene las hermosas Islas Galápagos con tortugas gigantes!" },
+            "PE": { iso3: "PER", name: "Perú", capital: "Lima", capitalCoords: [-12.0464, -77.0428], flag: "🇵🇪", region: "south", coords: [-9.1900, -75.0152], zoom: 4.5, fact: "Hogar de la mística ciudad de Machu Picchu en lo alto de las nubes, tiernas alpacas y ¡más de 3,000 tipos de patatas!" },
+            "BO": { iso3: "BOL", name: "Bolivia", capital: "Sucre", capitalCoords: [-19.0196, -65.2619], flag: "🇧🇴", region: "south", coords: [-16.2902, -63.5887], zoom: 4.5, fact: "¡Tiene el Salar de Uyuni! El desierto de sal más grande de la Tierra, que actúa como un gigantesco espejo del cielo." },
+            "BR": { iso3: "BRA", name: "Brasil", capital: "Brasilia", capitalCoords: [-15.7975, -47.8919], flag: "🇧🇷", region: "south", coords: [-14.2350, -51.9253], zoom: 3.5, fact: "¡El gigante verde de abajo! Tiene la selva del Amazonas y celebra el carnaval más grande y festivo de todo el mundo." },
+            "PY": { iso3: "PRY", name: "Paraguay", capital: "Asunción", capitalCoords: [-25.2637, -57.5759], flag: "🇵🇾", region: "south", coords: [-23.4425, -58.4438], zoom: 5.5, fact: "No tiene costa marina, pero sí ríos de agua dulce inmensos, y su gente habla guaraní, un idioma nativo precioso." },
+            "CL": { iso3: "CHL", name: "Chile", capital: "Santiago", capitalCoords: [-33.4489, -70.6693], flag: "🇨🇱", region: "south", coords: [-35.6751, -71.5430], zoom: 3.5, fact: "¡El país más largo y delgadito del planeta! Tiene desiertos secos arriba y glaciares de hielo azul real abajo." },
+            "AR": { iso3: "ARG", name: "Argentina", capital: "Buenos Aires", capitalCoords: [-34.6037, -58.3816], flag: "🇦🇷", region: "south", coords: [-38.4161, -63.6167], zoom: 3.5, fact: "¡Tierra de fósiles de dinosaurios gigantes, té de mate calentito, hermosos glaciares en la Patagonia, y cuna de Leo Messi!" },
+            "UY": { iso3: "URY", name: "Uruguay", capital: "Montevideo", capitalCoords: [-34.9011, -56.1645], flag: "🇺🇾", region: "south", coords: [-32.5228, -55.7658], zoom: 6, fact: "¡Un hermoso país de colinas verdes y playas tranquilas! Su gente adora pasear llevando su termo y su mate a todas partes." }
+        };
+
+        let gameState = {
+            score: 0,
+            streak: 0,
+            bestStreak: 0,
+            voiceEnabled: false,
+            findTarget: null,
+            findTries: 0,
+            isWaiting: false, // Previene clics mientras se muestra la bandera y hace zoom
+            guessed: new Set(), // Países ya adivinados correctamente
+            usedHintThisQuestion: false, // Si Maite pidió pista de Tuki en la pregunta actual
+            learnedNoHint: 0, // Aprendidos sin ayuda
+            learnedWithHint: 0 // Aprendidos con ayuda de Tuki
+        };
+
+
+        // Polígono extra: Guayana Francesa (no viene en el GeoJSON 110m porque es territorio de Francia)
+        const EXTRA_FEATURES = [
+            {"type":"Feature","id":"GUF","properties":{"ISO_A3":"GUF","NAME":"French Guiana"},"geometry":{"type":"Polygon","coordinates":[[[-54.61626,2.326758],[-54.604736,2.335791],[-54.568408,2.342578],[-54.535937,2.343311],[-54.485547,2.416113],[-54.402002,2.461523],[-54.256738,2.713721],[-54.195508,2.817871],[-54.188086,2.874854],[-54.170703,2.993604],[-54.203125,3.138184],[-54.188037,3.17876],[-54.063184,3.35332],[-54.00957,3.448535],[-54.005957,3.530518],[-53.990479,3.589551],[-54.005908,3.62041],[-54.034229,3.629395],[-54.081982,3.705957],[-54.112793,3.769434],[-54.197461,3.834424],[-54.255518,3.901074],[-54.350732,4.054102],[-54.342139,4.140039],[-54.369141,4.170947],[-54.398389,4.20249],[-54.39624,4.241406],[-54.416016,4.337646],[-54.440674,4.428027],[-54.449609,4.48501],[-54.426074,4.583008],[-54.440234,4.691992],[-54.471143,4.749316],[-54.479687,4.836523],[-54.47334,4.914697],[-54.446875,4.958789],[-54.452197,5.013477],[-54.331641,5.187402],[-54.240186,5.288232],[-54.155957,5.358984],[-54.085303,5.411816],[-53.9896,5.676025],[-53.919922,5.768994],[-53.847168,5.782227],[-53.454443,5.563477],[-53.270361,5.543262],[-52.899316,5.425049],[-52.76499,5.273486],[-52.453955,5.021338],[-52.290527,4.942187],[-52.288916,4.876123],[-52.324609,4.770898],[-52.219971,4.862793],[-52.058105,4.717383],[-52.012305,4.645996],[-51.961914,4.514404],[-51.979346,4.429883],[-52.001709,4.38623],[-52.00293,4.352295],[-51.954785,4.399072],[-51.927686,4.436133],[-51.91958,4.524316],[-51.880273,4.63374],[-51.827539,4.635693],[-51.785645,4.570508],[-51.698633,4.286816],[-51.66582,4.228809],[-51.653271,4.13877],[-51.658105,4.098486],[-51.652539,4.061279],[-51.683447,4.039697],[-51.76709,3.992676],[-51.805273,3.929932],[-51.82749,3.86958],[-51.879492,3.828564],[-51.928906,3.776953],[-51.944336,3.735107],[-51.990625,3.702002],[-51.999512,3.646875],[-52.116113,3.452295],[-52.162598,3.364697],[-52.229443,3.27168],[-52.27124,3.237109],[-52.327881,3.181738],[-52.356641,3.117725],[-52.356641,3.051562],[-52.396387,2.972217],[-52.418408,2.903857],[-52.455859,2.86416],[-52.554688,2.647656],[-52.559473,2.573145],[-52.583008,2.528906],[-52.653174,2.425732],[-52.700635,2.363672],[-52.783398,2.317187],[-52.87041,2.26665],[-52.903467,2.211523],[-52.964844,2.183545],[-53.009717,2.181738],[-53.082275,2.201709],[-53.180078,2.211328],[-53.229785,2.204883],[-53.252197,2.232275],[-53.285498,2.295215],[-53.334424,2.339746],[-53.366016,2.324219],[-53.431836,2.279443],[-53.508984,2.253125],[-53.563965,2.261914],[-53.683691,2.29292],[-53.734717,2.308545],[-53.750146,2.33501],[-53.767773,2.354834],[-53.794238,2.345996],[-53.829541,2.312939],[-53.876611,2.278271],[-53.946436,2.232568],[-54.089746,2.150488],[-54.130078,2.121045],[-54.167383,2.137061],[-54.227979,2.15332],[-54.293066,2.154248],[-54.433105,2.20752],[-54.515088,2.245459],[-54.550488,2.293066],[-54.591943,2.31377],[-54.61626,2.326758]]]}}
+        ];
+
+        let map;
+        let mapTiles = {};
+        let currentTileType = 'voyager';
+        let countryGeoJsonLayer = null;
+        let activeMarkers = []; // Almacena las banderas reveladas temporalmente
+        let permanentCheckMarkers = {}; // ✓ persistente en países adivinados
+        let geojsonCache = null;
+        let highlightedLayer = null; // Layer GeoJSON destacada al revelar respuesta
+
+        // Inicializar el Mapa Real de Leaflet
+        function initRealMap() {
+            map = L.map('leaflet-map', {
+                center: [12.0, -80.0],
+                zoom: 3,
+                minZoom: 2,
+                maxZoom: 10,
+                zoomControl: true,
+                attributionControl: false
+            });
+
+            // Tile layer: CartoDB Voyager SIN nombres (para que las respuestas no estén escritas)
+            mapTiles.voyagerNoLabels = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager_nolabels/{z}/{x}/{y}{r}.png', {
+                maxZoom: 19
+            }).addTo(map);
+
+            // Descargar límites fronterizos (GeoJSON) reales del mundo
+            fetchGeoJsonBorders();
+        }
+
+
+        // Descargar el archivo de fronteras simplificadas y cargarlas
+        function fetchGeoJsonBorders() {
+            const url = 'https://raw.githubusercontent.com/datasets/geo-boundaries-world-110m/main/countries.geojson';
+
+            fetch(url)
+                .then(response => {
+                    if (!response.ok) throw new Error('No se pudo descargar el mapa de fronteras.');
+                    return response.json();
+                })
+                .then(data => {
+                    geojsonCache = data;
+                    // Agregar polígonos extra (Guayana Francesa) que no vienen en el dataset 110m
+                    geojsonCache.features = geojsonCache.features.concat(EXTRA_FEATURES);
+                    renderGeoJsonBorders();
+                    document.getElementById('map-loader').classList.add('opacity-0');
+                    setTimeout(() => {
+                        document.getElementById('map-loader').classList.add('hidden');
+                        if (map) map.invalidateSize();
+                    }, 500);
+                })
+                .catch(error => {
+                    console.warn("Fallo cargando GeoJSON, jugaremos con clics de aproximación física.", error);
+                    document.getElementById('map-loader').classList.add('hidden');
+                });
+        }
+
+        function renderGeoJsonBorders() {
+            if (!geojsonCache) return;
+
+            if (countryGeoJsonLayer) {
+                map.removeLayer(countryGeoJsonLayer);
+            }
+
+            countryGeoJsonLayer = L.geoJSON(geojsonCache, {
+                filter: function(feature) {
+                    const iso3 = feature.id || (feature.properties && (feature.properties.ISO_A3 || feature.properties.iso_a3));
+                    return Object.values(countriesData).some(c => c.iso3 === iso3);
+                },
+                style: function(feature) {
+                    const iso3 = feature.id || (feature.properties && (feature.properties.ISO_A3 || feature.properties.iso_a3));
+                    const countryKey = Object.keys(countriesData).find(k => countriesData[k].iso3 === iso3);
+                    const countryInfo = countriesData[countryKey];
+
+                    // Si ya fue adivinado, estilo verde permanente
+                    if (countryKey && gameState.guessed.has(countryKey)) {
+                        return {
+                            fillColor: '#86efac',
+                            weight: 2.5,
+                            opacity: 0.9,
+                            color: '#16a34a',
+                            fillOpacity: 0.55
+                        };
+                    }
+
+                    let regionColor = "#e2e8f0";
+                    if (countryInfo) {
+                        if (countryInfo.region === 'north') regionColor = "#fca5a5"; // Rojo pastel
+                        if (countryInfo.region === 'central') regionColor = "#93c5fd"; // Azul pastel
+                        if (countryInfo.region === 'south') regionColor = "#fde047"; // Amarillo pastel
+                    }
+
+                    return {
+                        fillColor: regionColor,
+                        weight: 2,
+                        opacity: 0.8,
+                        color: 'white',
+                        fillOpacity: 0.35
+                    };
+                },
+                onEachFeature: function(feature, layer) {
+                    const iso3 = feature.id || (feature.properties && (feature.properties.ISO_A3 || feature.properties.iso_a3));
+                    const countryKey = Object.keys(countriesData).find(k => countriesData[k].iso3 === iso3);
+
+                    if (countryKey) {
+                        layer.on({
+                            mouseover: function(e) {
+                                if (gameState.isWaiting) return;
+                                e.target.setStyle({
+                                    fillOpacity: 0.6,
+                                    weight: 3,
+                                    color: '#b5a8a1' // Color gris de Pusheen
+                                });
+                            },
+                            mouseout: function(e) {
+                                countryGeoJsonLayer.resetStyle(e.target);
+                            },
+                            click: function() {
+                                if (gameState.isWaiting) return;
+                                handleCountryClick(countryKey);
+                            }
+                        });
+                    }
+                }
+            }).addTo(map);
+        }
+
+        // Sintetizador de voz integrado
+        const synth = window.speechSynthesis;
+        let speakVoice = null;
+
+        function loadVoices() {
+            if (!synth) return;
+            const voices = synth.getVoices();
+            speakVoice = voices.find(v => v.lang.startsWith('es-')) || voices[0];
+        }
+        if (synth) {
+            if (synth.onvoiceschanged !== undefined) {
+                synth.onvoiceschanged = loadVoices;
+            }
+            loadVoices();
+        }
+
+        function speak(text) {
+            if (!gameState.voiceEnabled || !synth) return;
+            synth.cancel();
+            const utterance = new SpeechSynthesisUtterance(text);
+            if (speakVoice) utterance.voice = speakVoice;
+            utterance.rate = 1.0;
+            utterance.pitch = 1.25; // Tono alegre infantil
+            synth.speak(utterance);
+        }
+
+        function toggleVoice() {
+            gameState.voiceEnabled = !gameState.voiceEnabled;
+            const btn = document.getElementById('btn-voice');
+            const icon = document.getElementById('voice-icon');
+            const baseClass = "flex items-center gap-1 font-bold px-2 py-1 rounded-full shadow-md transition-all text-[10px] md:text-xs min-h-[28px]";
+
+            if (gameState.voiceEnabled) {
+                icon.textContent = "🔊";
+                btn.className = baseClass + " bg-pink-400 hover:bg-pink-500 text-white";
+                speak("¡Activamos la voz para ayudarte!");
+            } else {
+                icon.textContent = "🔇";
+                btn.className = baseClass + " bg-slate-300 hover:bg-slate-400 text-slate-700";
+                if (synth) synth.cancel();
+            }
+        }
+
+        // Generar sonidos sencillos
+        function playSound(type) {
+            try {
+                const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+
+                if (type === 'success') {
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(523.25, ctx.currentTime); // C5
+                    osc.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.1); // A5
+                    osc.frequency.exponentialRampToValueAtTime(1046.50, ctx.currentTime + 0.25); // C6
+                    gain.gain.setValueAtTime(0.15, ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.35);
+                    osc.start();
+                    osc.stop(ctx.currentTime + 0.35);
+                } else if (type === 'error') {
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(220, ctx.currentTime);
+                    osc.frequency.linearRampToValueAtTime(130, ctx.currentTime + 0.25);
+                    gain.gain.setValueAtTime(0.15, ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3);
+                    osc.start();
+                    osc.stop(ctx.currentTime + 0.3);
+                } else if (type === 'streak') {
+                    const notes = [261.63, 329.63, 392.00, 523.25, 659.25, 783.99, 1046.50];
+                    notes.forEach((freq, idx) => {
+                        const o = ctx.createOscillator();
+                        const g = ctx.createGain();
+                        o.connect(g);
+                        g.connect(ctx.destination);
+                        o.type = 'sine';
+                        o.frequency.value = freq;
+                        g.gain.setValueAtTime(0, ctx.currentTime);
+                        g.gain.linearRampToValueAtTime(0.12, ctx.currentTime + (idx * 0.08));
+                        g.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + (idx * 0.08) + 0.35);
+                        o.start(ctx.currentTime + (idx * 0.08));
+                        o.stop(ctx.currentTime + (idx * 0.08) + 0.35);
+                    });
+                }
+            } catch (e) {
+                console.warn("Audio Context bloqueado o no soportado.", e);
+            }
+        }
+
+        // Limpiar todas las banderas reveladas
+        function clearTemporaryMarkers() {
+            activeMarkers.forEach(marker => {
+                if (map.hasLayer(marker)) {
+                    map.removeLayer(marker);
+                }
+            });
+            activeMarkers = [];
+            clearHighlight();
+            hideRevealBanner();
+            hideCapitalLocationMarker();
+        }
+
+        // Resaltar el polígono GeoJSON del país correcto con verde brillante
+        function highlightCorrectCountry(countryKey) {
+            clearHighlight();
+            if (!countryGeoJsonLayer) return;
+            const target = countriesData[countryKey];
+            if (!target) return;
+
+            countryGeoJsonLayer.eachLayer(layer => {
+                const feature = layer.feature;
+                const iso3 = feature.id || (feature.properties && (feature.properties.ISO_A3 || feature.properties.iso_a3));
+                if (iso3 === target.iso3) {
+                    highlightedLayer = layer;
+                    layer.setStyle({
+                        fillColor: '#10b981',
+                        fillOpacity: 0.7,
+                        color: '#047857',
+                        weight: 5,
+                        opacity: 1
+                    });
+                    if (layer.bringToFront) layer.bringToFront();
+                }
+            });
+        }
+
+        function clearHighlight() {
+            if (highlightedLayer && countryGeoJsonLayer) {
+                countryGeoJsonLayer.resetStyle(highlightedLayer);
+                highlightedLayer = null;
+            }
+        }
+
+        // Banner de reveal (visible y prominente arriba del mapa)
+        function showRevealBanner(countryKey, mode) {
+            const country = countriesData[countryKey];
+            if (!country) return;
+            const banner = document.getElementById('reveal-banner');
+            const label = document.getElementById('reveal-label');
+            const flag = document.getElementById('reveal-flag');
+            const name = document.getElementById('reveal-name');
+            const extra = document.getElementById('reveal-extra');
+
+            if (mode === 'wrong') {
+                banner.style.background = 'linear-gradient(135deg, #ef4444, #b91c1c)';
+                banner.style.boxShadow = '0 8px 25px rgba(239, 68, 68, 0.45)';
+                label.textContent = '¡El correcto era ';
+                extra.textContent = '¿Cuál será su capital? 👇';
+            } else {
+                banner.style.background = 'linear-gradient(135deg, #10b981, #059669)';
+                banner.style.boxShadow = '0 8px 25px rgba(16, 185, 129, 0.45)';
+                label.textContent = '¡Correcto! Es ';
+                extra.textContent = '¿Cuál será su capital? 👇';
+            }
+            flag.textContent = country.flag;
+            name.textContent = country.name;
+            banner.classList.add('show');
+        }
+
+        function hideRevealBanner() {
+            const banner = document.getElementById('reveal-banner');
+            if (banner) banner.classList.remove('show');
+        }
+
+        // Estado del quiz de capital activo
+        let currentCapitalQuiz = null; // { correctCountryKey, options, wasCountryRight, correctCapital }
+        let pendingNextTimer = null;
+
+        // Genera 3 opciones de capitales: la correcta + 2 distractoras
+        function buildCapitalOptions(correctCountryKey) {
+            const correct = countriesData[correctCountryKey];
+            const otherCapitals = Object.values(countriesData)
+                .filter(c => c.capital !== correct.capital)
+                .map(c => c.capital);
+            // Priorizar misma región para distractoras más interesantes
+            const sameRegion = Object.values(countriesData)
+                .filter(c => c.region === correct.region && c.capital !== correct.capital)
+                .map(c => c.capital);
+            const pool = sameRegion.length >= 2 ? sameRegion : otherCapitals;
+            const shuffled = pool.slice().sort(() => Math.random() - 0.5);
+            const distractors = shuffled.slice(0, 2);
+            const all = [correct.capital, ...distractors].sort(() => Math.random() - 0.5);
+            return all;
+        }
+
+        // Mostrar el quiz de capital después del click en país
+        function showCapitalQuiz(correctCountryKey, wasCountryRight, clickedCountryKey) {
+            // Ocultar banner del mapa: el contexto ya está en la columna izquierda y los pins son claros
+            hideRevealBanner();
+            const correct = countriesData[correctCountryKey];
+            const options = buildCapitalOptions(correctCountryKey);
+            currentCapitalQuiz = {
+                correctCountryKey,
+                options,
+                wasCountryRight,
+                correctCapital: correct.capital
+            };
+
+            // Texto de contexto: clickeado vs correcto si erró
+            const ctxEl = document.getElementById('capital-quiz-context');
+            if (wasCountryRight) {
+                ctxEl.innerHTML = `<span class="text-green-700">✓ Encontraste <b>${correct.flag} ${correct.name}</b></span>`;
+            } else {
+                const clicked = countriesData[clickedCountryKey];
+                ctxEl.innerHTML = `<span class="text-red-600">❌ Clickeaste <b>${clicked.flag} ${clicked.name}</b></span><br><span class="text-green-700">✓ El correcto era <b>${correct.flag} ${correct.name}</b></span>`;
+            }
+
+            document.getElementById('capital-quiz-country').textContent = correct.name;
+
+            options.forEach((cap, i) => {
+                const btn = document.getElementById(`cap-opt-${i}`);
+                btn.textContent = cap;
+                btn.classList.remove('correct', 'wrong-pick');
+                btn.disabled = false;
+            });
+            document.getElementById('capital-feedback').textContent = '';
+
+            document.getElementById('default-controls').classList.add('hidden');
+            document.getElementById('capital-quiz').classList.remove('hidden');
+
+            // ⭐ Marcador en el mapa indicando la ubicación de la capital
+            showCapitalLocationMarker(correctCountryKey);
+
+            speak(`Mirá la estrella en el mapa, ahí está la capital de ${correct.name}. ¿Cuál es?`);
+        }
+
+        function hideCapitalQuiz() {
+            document.getElementById('capital-quiz').classList.add('hidden');
+            document.getElementById('default-controls').classList.remove('hidden');
+            hideCapitalLocationMarker();
+            currentCapitalQuiz = null;
+        }
+
+        // Maneja la elección de capital
+        function handleCapitalChoice(idx) {
+            if (!currentCapitalQuiz) return;
+            const { correctCountryKey, options, wasCountryRight, correctCapital } = currentCapitalQuiz;
+            const chosen = options[idx];
+            const isCapitalRight = chosen === correctCapital;
+            const country = countriesData[correctCountryKey];
+
+            // Marcar visualmente los botones
+            for (let i = 0; i < 3; i++) {
+                const btn = document.getElementById(`cap-opt-${i}`);
+                btn.disabled = true;
+                if (options[i] === correctCapital) btn.classList.add('correct');
+                else if (i === idx && !isCapitalRight) btn.classList.add('wrong-pick');
+            }
+
+            const feedbackEl = document.getElementById('capital-feedback');
+
+            if (wasCountryRight && isCapitalRight) {
+                // ¡EMBOCÓ AMBOS! → aprende el país
+                playSound('success');
+                // Bonus extra si lo hizo sin pedir pista
+                const usedHint = gameState.usedHintThisQuestion;
+                gameState.score += usedHint ? 7 : 10;
+                gameState.streak++;
+                if (gameState.streak > gameState.bestStreak) gameState.bestStreak = gameState.streak;
+                markCountryAsGuessed(correctCountryKey);
+                if (usedHint) gameState.learnedWithHint++;
+                else gameState.learnedNoHint++;
+                updateHintCounters();
+                document.getElementById('score-counter').textContent = gameState.score;
+                document.getElementById('find-streak').textContent = gameState.streak;
+                document.getElementById('best-streak').textContent = gameState.bestStreak;
+                updatePusheenStatus(gameState.streak);
+
+                const hintNote = usedHint ? ' (con pista 💡)' : ' (¡sin pista! 💪)';
+                const stars = usedHint ? '+7' : '+10';
+                feedbackEl.innerHTML = `<span class="text-green-600">¡Perfecto! ${country.name} y su capital ${country.capital} aprendidos${hintNote}. ⭐${stars}</span>`;
+                document.getElementById('tuki-speech').textContent = `¡Genial Maite! ${country.name} con capital ${country.capital}. ${country.fact}`;
+                speak(`¡Perfecto! ${country.capital} es la capital de ${country.name}. Aprendiste el país completo.`);
+                triggerConfetti();
+
+                // Hitos de racha
+                if ([3,5,8,12,15].includes(gameState.streak)) {
+                    pendingNextTimer = setTimeout(() => triggerPusheenCelebration(gameState.streak), 1400);
+                } else {
+                    pendingNextTimer = setTimeout(() => { hideCapitalQuiz(); autoZoomOutAndNext(); }, 4000);
+                }
+            } else {
+                playSound('error');
+                gameState.streak = 0;
+                document.getElementById('find-streak').textContent = 0;
+                updatePusheenStatus(0);
+
+                if (wasCountryRight && !isCapitalRight) {
+                    feedbackEl.innerHTML = `<span class="text-amber-600">Casi: ${country.name} ✓ pero su capital es <b>${country.capital}</b>, no ${chosen}. ¡Lo verás otra vez!</span>`;
+                    speak(`Encontraste el país pero la capital de ${country.name} es ${country.capital}.`);
+                    document.getElementById('tuki-speech').textContent = `Encontraste ${country.name} pero la capital es ${country.capital}. ¡Volverá a aparecer para que lo aprendas completo!`;
+                } else if (!wasCountryRight && isCapitalRight) {
+                    feedbackEl.innerHTML = `<span class="text-amber-600">¡Sabías la capital ${country.capital}! Pero no era el país correcto. Volverá a aparecer.</span>`;
+                    speak(`Bien, ${country.capital} es la capital. Pero al país hay que ubicarlo de nuevo.`);
+                    document.getElementById('tuki-speech').textContent = `¡Bien la capital! Pero el país no estaba ubicado bien. ${country.name} volverá a aparecer.`;
+                } else {
+                    feedbackEl.innerHTML = `<span class="text-red-600">El país era <b>${country.name}</b> y la capital es <b>${country.capital}</b>. ¡Volverá!</span>`;
+                    speak(`Era ${country.name} con capital ${country.capital}.`);
+                    document.getElementById('tuki-speech').textContent = `Era ${country.name} con capital ${country.capital}. ¡Volverá para que lo aprendas!`;
+                }
+
+                pendingNextTimer = setTimeout(() => { hideCapitalQuiz(); autoZoomOutAndNext(); }, 5500);
+            }
+        }
+
+        // ✓ Marcar un país como adivinado: contador, polígono verde, check persistente
+        function markCountryAsGuessed(countryKey) {
+            if (gameState.guessed.has(countryKey)) return;
+            gameState.guessed.add(countryKey);
+
+            const country = countriesData[countryKey];
+            const icon = L.divIcon({
+                className: '',
+                html: '<div class="guessed-check">✓</div>',
+                iconSize: [30, 30],
+                iconAnchor: [15, 15]
+            });
+            const marker = L.marker(country.coords, { icon: icon, interactive: false, keyboard: false }).addTo(map);
+            permanentCheckMarkers[countryKey] = marker;
+
+            // Repintar el polígono GeoJSON en verde adivinado
+            if (countryGeoJsonLayer) {
+                countryGeoJsonLayer.eachLayer(layer => {
+                    const feature = layer.feature;
+                    const iso3 = feature.id || (feature.properties && (feature.properties.ISO_A3 || feature.properties.iso_a3));
+                    if (iso3 === country.iso3) {
+                        countryGeoJsonLayer.resetStyle(layer);
+                    }
+                });
+            }
+
+            updateProgressCounter();
+        }
+
+        function updateProgressCounter() {
+            const total = Object.keys(countriesData).length;
+            const counter = document.getElementById('progress-counter');
+            const totalEl = document.getElementById('progress-total');
+            if (counter) counter.textContent = gameState.guessed.size;
+            if (totalEl) totalEl.textContent = total;
+        }
+
+        function updateHintCounters() {
+            const noHint = document.getElementById('learned-no-hint');
+            const withHint = document.getElementById('learned-with-hint');
+            if (noHint) noHint.textContent = gameState.learnedNoHint;
+            if (withHint) withHint.textContent = gameState.learnedWithHint;
+        }
+
+        function clearAllPermanentMarkers() {
+            Object.values(permanentCheckMarkers).forEach(m => {
+                if (map.hasLayer(m)) map.removeLayer(m);
+            });
+            permanentCheckMarkers = {};
+        }
+
+        function flashMapError() {
+            const wrapper = document.getElementById('map-wrapper');
+            if (!wrapper) return;
+            wrapper.classList.remove('flash-error');
+            void wrapper.offsetWidth;
+            wrapper.classList.add('flash-error');
+            setTimeout(() => wrapper.classList.remove('flash-error'), 1000);
+        }
+
+        // Marcador estrella en la ubicación de la capital (durante el quiz)
+        let capitalMarker = null;
+        function showCapitalLocationMarker(countryKey) {
+            hideCapitalLocationMarker();
+            const country = countriesData[countryKey];
+            if (!country || !country.capitalCoords) return;
+            const icon = L.divIcon({
+                className: '',
+                html: '<div class="capital-marker">⭐</div>',
+                iconSize: [40, 40],
+                iconAnchor: [20, 20]
+            });
+            capitalMarker = L.marker(country.capitalCoords, { icon, interactive: false, keyboard: false }).addTo(map);
+        }
+        function hideCapitalLocationMarker() {
+            if (capitalMarker && map.hasLayer(capitalMarker)) {
+                map.removeLayer(capitalMarker);
+            }
+            capitalMarker = null;
+        }
+
+        // Crear una bandera flotante interactiva en un país específico
+        function createTemporaryFlagMarker(countryId, isCorrectType) {
+            const country = countriesData[countryId];
+            if (!country) return;
+
+            const markerClass = isCorrectType ? 'target-pin-pulse-success' : 'target-pin-pulse-error';
+            const flagEmoji = isCorrectType ? country.flag : '❌';
+
+            const customIcon = L.divIcon({
+                className: '',
+                html: `<div class="custom-flag-pin ${markerClass}">${flagEmoji}</div>`,
+                iconSize: [48, 48],
+                iconAnchor: [24, 24]
+            });
+
+            const marker = L.marker(country.coords, { icon: customIcon }).addTo(map);
+            activeMarkers.push(marker);
+        }
+
+        function handleCountryClick(countryId) {
+            if (gameState.isWaiting) return;
+
+            gameState.isWaiting = true; // Bloquear mapa durante animaciones
+            const targetCountry = countriesData[gameState.findTarget];
+            const clickedCountry = countriesData[countryId];
+
+            gameState.findTries++;
+            document.getElementById('find-tries').textContent = gameState.findTries;
+
+            clearTemporaryMarkers();
+
+            const targetKey = gameState.findTarget;
+
+            if (countryId === targetKey) {
+                // ✅ Acertó el país. PERO solo cuenta como aprendido si TAMBIÉN acierta la capital.
+                playSound('success');
+                createTemporaryFlagMarker(countryId, true);
+                highlightCorrectCountry(countryId);
+                showRevealBanner(countryId, 'correct');
+                map.flyTo(targetCountry.coords, targetCountry.zoom + 1, { animate: true, duration: 1.2 });
+
+                document.getElementById('tuki-speech').textContent = `¡Bien! Encontraste ${targetCountry.name}. Ahora elegí su capital.`;
+                speak(`¡Encontraste ${targetCountry.name}! Ahora dime cuál es su capital.`);
+
+                // Después del zoom in, mostrar el quiz de capital
+                setTimeout(() => {
+                    showCapitalQuiz(targetKey, true, countryId);
+                }, 1800);
+
+            } else {
+                // ❌ Erró el país. Mostrar AMBOS países con nombre y bandera. Después igual hacer el quiz de capital.
+                playSound('error');
+                flashMapError();
+
+                highlightCorrectCountry(targetKey);
+                createTemporaryFlagMarker(targetKey, true); // El correcto
+                createTemporaryFlagMarker(countryId, false); // El equivocado
+                showRevealBanner(targetKey, 'wrong');
+
+                speak(`Hiciste click en ${clickedCountry.name}, pero el correcto era ${targetCountry.name}. Vamos a aprender su capital.`);
+                document.getElementById('tuki-speech').textContent = `Clickeaste ${clickedCountry.name} — el correcto era ${targetCountry.name}. Aprendamos su capital.`;
+
+                // Encuadrar AMBOS países: el clickeado (❌) y el correcto (✓) para que Maite vea dónde se equivocó
+                const bothBounds = L.latLngBounds([
+                    L.latLng(clickedCountry.coords[0], clickedCountry.coords[1]),
+                    L.latLng(targetCountry.coords[0], targetCountry.coords[1])
+                ]);
+                map.flyToBounds(bothBounds, {
+                    paddingTopLeft: [70, 70],
+                    paddingBottomRight: [70, 90], // un poco más abajo para no chocar con el banner
+                    duration: 1.2,
+                    maxZoom: 5
+                });
+
+                // Después de un tiempito para mirar el mapa, mostrar el quiz de capital
+                setTimeout(() => {
+                    showCapitalQuiz(targetKey, false, countryId);
+                }, 2800);
+            }
+        }
+
+        // Zoom Out Automático y Preparación de Nueva Ronda
+        function autoZoomOutAndNext() {
+            // Regresar la cámara al mapa completo de América real
+            map.flyTo([12.0, -80.0], 3, { animate: true, duration: 1.5 });
+
+            // Esperar que termine el vuelo para limpiar y poner nueva pregunta
+            setTimeout(() => {
+                clearTemporaryMarkers();
+                gameState.isWaiting = false;
+                setupNewFindTarget();
+            }, 1600);
+        }
+
+        function updatePusheenStatus(streak) {
+            const display = document.getElementById('pusheen-big-display');
+            const status = document.getElementById('pusheen-status-text');
+            const badge = document.getElementById('streak-badge');
+            const emojiTemplate = (e) => `<div class="leading-none animate-bounce select-none" style="font-size: clamp(48px, 9vh, 96px);">${e}</div>`;
+
+            if (streak === 0) {
+                display.innerHTML = emojiTemplate('🐱');
+                status.textContent = "¡Pusheen espera tu racha!";
+            } else if (streak >= 1 && streak < 3) {
+                display.innerHTML = emojiTemplate('🍩');
+                status.textContent = `¡Racha de ${streak}! ¡Casi lista para las galletas!`;
+            } else if (streak >= 3 && streak < 5) {
+                display.innerHTML = getPusheenSVG(3);
+                status.textContent = `¡Racha de ${streak}! ¡Pusheen come galletas!`;
+            } else if (streak >= 5 && streak < 8) {
+                display.innerHTML = getPusheenSVG(5);
+                status.textContent = `¡Racha de ${streak}! ¡Pusheen baila con globos!`;
+            } else if (streak >= 8) {
+                display.innerHTML = getPusheenSVG(8);
+                status.textContent = `¡Racha mágica de ${streak}! ¡Pusheen Unicornio!`;
+            }
+
+            // Badge dinámico solo cuando hay racha real
+            if (badge) {
+                if (streak === 0) {
+                    badge.classList.add('hidden');
+                } else {
+                    badge.classList.remove('hidden');
+                    if (streak < 3) {
+                        badge.textContent = `🔥 ${streak}`;
+                        badge.className = 'text-[10px] md:text-xs font-bold px-2 py-0.5 rounded-full bg-orange-100 text-orange-700';
+                    } else if (streak < 5) {
+                        badge.textContent = '🍪 ¡En racha!';
+                        badge.className = 'text-[10px] md:text-xs font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700';
+                    } else if (streak < 8) {
+                        badge.textContent = '🎈 ¡Súper!';
+                        badge.className = 'text-[10px] md:text-xs font-bold px-2 py-0.5 rounded-full bg-pink-100 text-pink-700';
+                    } else {
+                        badge.textContent = '🦄 ¡Mágica!';
+                        badge.className = 'text-[10px] md:text-xs font-bold px-2 py-0.5 rounded-full bg-purple-100 text-purple-700';
+                    }
+                }
+            }
+        }
+
+        // Configurar nuevo objetivo de búsqueda (solo entre países que no fueron adivinados)
+        function setupNewFindTarget() {
+            clearTemporaryMarkers();
+            hideCapitalQuiz();
+            if (pendingNextTimer) { clearTimeout(pendingNextTimer); pendingNextTimer = null; }
+
+            // Reset del flag de pista para la nueva pregunta
+            gameState.usedHintThisQuestion = false;
+            const badge = document.getElementById('hint-used-badge');
+            if (badge) badge.classList.add('hidden');
+
+            const allKeys = Object.keys(countriesData);
+            const remainingKeys = allKeys.filter(k => !gameState.guessed.has(k));
+
+            // ¡Completó todos los países! Celebración máxima
+            if (remainingKeys.length === 0) {
+                gameState.findTarget = null;
+                document.getElementById('find-target-flag').textContent = '🏆';
+                document.getElementById('find-target-name').textContent = '¡Completo!';
+                triggerCompletionCelebration();
+                return;
+            }
+
+            const randomId = remainingKeys[Math.floor(Math.random() * remainingKeys.length)];
+            const target = countriesData[randomId];
+
+            gameState.findTarget = randomId;
+
+            document.getElementById('find-target-flag').textContent = target.flag;
+            document.getElementById('find-target-name').textContent = target.name;
+
+            speak(`Maite, ¿dónde está ${target.name}?`);
+        }
+
+        // Pistas del Tucán Tuki geográficamente realistas
+        function giveHint() {
+            if (gameState.isWaiting) return;
+            const target = countriesData[gameState.findTarget];
+            if (!target) return;
+
+            // Marcar que se usó pista en esta pregunta (afecta cómo se cuenta el aprendido)
+            gameState.usedHintThisQuestion = true;
+            const badge = document.getElementById('hint-used-badge');
+            if (badge) badge.classList.remove('hidden');
+
+            let regionName = "";
+            let physicalHint = "";
+
+            if (target.region === 'north') {
+                regionName = "América del Norte (arriba en el mapa real ❄️)";
+                if (target.iso3 === 'CAN') physicalHint = "Es enorme y está cerca de los glaciares helados del polo norte.";
+                else if (target.iso3 === 'USA') physicalHint = "Ocupa la parte central superior del continente, abajo de Canadá.";
+                else if (target.iso3 === 'MEX') physicalHint = "Tiene mares cálidos, desiertos áridos y conecta directo con Centroamérica.";
+            } else if (target.region === 'central') {
+                regionName = "Centroamérica o las islas del Caribe (en el centro del mapa 🌴)";
+                if (target.iso3 === 'CUB' || target.iso3 === 'DO' || target.iso3 === 'PR' || target.iso3 === 'JM' || target.iso3 === 'HT') {
+                    physicalHint = "Es una preciosa isla rodeada enteramente por las cálidas aguas turquesas del Mar Caribe.";
+                } else {
+                    physicalHint = "Es parte del estrecho puente terrestre que conecta las dos grandes Américas.";
+                }
+            } else if (target.region === 'south') {
+                regionName = "América del Sur (abajo en el mapa real 🏔️)";
+                if (target.iso3 === 'BRA') physicalHint = "Es el territorio más gigante de abajo. Se ve muy verde en satélite por la selva del Amazonas.";
+                else if (target.iso3 === 'CHL') physicalHint = "Es una franja larguísima y muy delgada recostada sobre el Océano Pacífico izquierdo.";
+                else if (target.iso3 === 'ARG') physicalHint = "Está abajo del todo a la derecha, cerca de las tierras frías de la Patagonia.";
+                else if (target.iso3 === 'COL') physicalHint = "Se encuentra justo en la esquina norte de Sudamérica, conectando directo con Panamá.";
+                else if (target.iso3 === 'PE' || target.iso3 === 'BO' || target.iso3 === 'EC') {
+                    physicalHint = "Se sitúa en el lado izquierdo de Sudamérica, atravesado por la inmensa Cordillera de los Andes.";
+                } else {
+                    physicalHint = "Se localiza en el cono sur del continente.";
+                }
+            }
+
+            const textHint = `¡Pista de Tuki! ${target.name} está en ${regionName}. ${physicalHint}`;
+            document.getElementById('tuki-speech').textContent = textHint;
+            speak(`Está en ${target.region === 'north' ? 'Norteamérica' : target.region === 'central' ? 'Centroamérica' : 'Sudamérica'}. ${physicalHint}`);
+        }
+
+
+        function getPusheenSVG(streakLevel) {
+            // El color de Pusheen real es un gris cálido suave: #c6b9b3.
+            // Las rayas y facciones de Pusheen real son un gris oscuro marrón: #554842.
+            // El color de las mejillas reales es un rosa pastel tierno: #ffb4b4.
+            const pGrey = "#c6b9b3";
+            const pDark = "#554842";
+            const pPink = "#ffb4b4";
+
+            if (streakLevel === 3) {
+                // Pusheen de Verdad comiendo una galleta gigante de chispas de chocolate
+                return `
+                <svg viewBox="0 0 200 150" class="w-48 h-48 pusheen-dance" xmlns="http://www.w3.org/2000/svg">
+                    <!-- Cola rayada de Pusheen -->
+                    <path d="M 148 110 C 168 114 185 106 182 94 C 179 84 152 94 146 102 Z" fill="${pGrey}" stroke="${pDark}" stroke-width="4.5" stroke-linejoin="round" />
+                    <!-- Rayas de la cola -->
+                    <path d="M 158 98 Q 164 102 165 94" stroke="${pDark}" stroke-width="4" fill="none" stroke-linecap="round" />
+                    <path d="M 166 102 Q 172 106 173 98" stroke="${pDark}" stroke-width="4" fill="none" stroke-linecap="round" />
+                    <path d="M 173 105 Q 179 108 178 101" stroke="${pDark}" stroke-width="4" fill="none" stroke-linecap="round" />
+
+                    <!-- Cuerpo gordo "tipo patata" de Pusheen -->
+                    <path d="M 45 100 C 38 65 158 65 152 100 C 150 128 125 136 98 136 C 71 136 47 128 45 100 Z" fill="${pGrey}" stroke="${pDark}" stroke-width="5" />
+
+                    <!-- Orejas pequeñas y redondeadas de Pusheen real -->
+                    <path d="M 58 71 C 58 60 68 52 74 65" fill="${pGrey}" stroke="${pDark}" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" />
+                    <path d="M 122 65 C 128 52 138 60 138 71" fill="${pGrey}" stroke="${pDark}" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" />
+
+                    <!-- Patitas inferiores cortitas -->
+                    <ellipse cx="68" cy="135" rx="8" ry="7" fill="${pGrey}" stroke="${pDark}" stroke-width="4.5" />
+                    <ellipse cx="128" cy="135" rx="8" ry="7" fill="${pGrey}" stroke="${pDark}" stroke-width="4.5" />
+
+                    <!-- Rayitas en la espalda -->
+                    <path d="M 150 82 Q 138 84 136 78" stroke="${pDark}" stroke-width="4.5" fill="none" stroke-linecap="round" />
+                    <path d="M 151 92 Q 139 94 137 88" stroke="${pDark}" stroke-width="4.5" fill="none" stroke-linecap="round" />
+
+                    <!-- 3 Rayitas finas en la frente -->
+                    <line x1="91" y1="65" x2="91" y2="74" stroke="${pDark}" stroke-width="4.5" stroke-linecap="round" />
+                    <line x1="98" y1="65" x2="98" y2="74" stroke="${pDark}" stroke-width="4.5" stroke-linecap="round" />
+                    <line x1="105" y1="65" x2="105" y2="74" stroke="${pDark}" stroke-width="4.5" stroke-linecap="round" />
+
+                    <!-- Ojos y boca tierno estilo "3" tumbado -->
+                    <circle cx="78" cy="90" r="3.5" fill="${pDark}" />
+                    <circle cx="118" cy="90" r="3.5" fill="${pDark}" />
+                    <!-- La mítica boquita de Pusheen -->
+                    <path d="M 93 93 Q 97 97 101 93 Q 105 97 109 93" fill="none" stroke="${pDark}" stroke-width="3.5" stroke-linecap="round" />
+
+                    <!-- Sonrojo sutil rosado -->
+                    <ellipse cx="70" cy="95" rx="5" ry="4" fill="${pPink}" />
+                    <ellipse cx="126" cy="95" rx="5" ry="4" fill="${pPink}" />
+
+                    <!-- Bigotes finos reales (2 en cada mejilla) -->
+                    <line x1="33" y1="91" x2="45" y2="93" stroke="${pDark}" stroke-width="3.5" stroke-linecap="round" />
+                    <line x1="33" y1="100" x2="45" y2="98" stroke="${pDark}" stroke-width="3.5" stroke-linecap="round" />
+                    <line x1="163" y1="91" x2="151" y2="93" stroke="${pDark}" stroke-width="3.5" stroke-linecap="round" />
+                    <line x1="163" y1="100" x2="151" y2="98" stroke="${pDark}" stroke-width="3.5" stroke-linecap="round" />
+
+                    <!-- Galleta de Chocolate deliciosa -->
+                    <circle cx="98" cy="114" r="19" fill="#d09852" stroke="${pDark}" stroke-width="4" />
+                    <circle cx="90" cy="106" r="3" fill="#583c18" />
+                    <circle cx="108" cy="108" r="2.5" fill="#583c18" />
+                    <circle cx="98" cy="122" r="3" fill="#583c18" />
+                    <circle cx="107" cy="119" r="2.5" fill="#583c18" />
+                    <circle cx="89" cy="118" r="2.5" fill="#583c18" />
+
+                    <!-- Patitas superiores gorditas abrazando la galleta -->
+                    <ellipse cx="80" cy="110" rx="7" ry="6" fill="${pGrey}" stroke="${pDark}" stroke-width="3.5" />
+                    <ellipse cx="116" cy="110" rx="7" ry="6" fill="${pGrey}" stroke="${pDark}" stroke-width="3.5" />
+                </svg>`;
+            } else if (streakLevel === 5) {
+                // Pusheen de verdad con un gorrito cónico de fiesta y globos de colores flotantes
+                return `
+                <svg viewBox="0 0 200 170" class="w-48 h-48 pusheen-spin" xmlns="http://www.w3.org/2000/svg">
+                    <!-- Globos festivos y sus hilos -->
+                    <path d="M 32 75 Q 22 105 52 120" stroke="${pDark}" stroke-width="1.8" fill="none" />
+                    <ellipse cx="28" cy="52" rx="14" ry="18" fill="#f472b6" />
+                    <polygon points="26,69 30,69 28,73" fill="#f472b6" />
+
+                    <path d="M 168 75 Q 178 105 144 120" stroke="${pDark}" stroke-width="1.8" fill="none" />
+                    <ellipse cx="172" cy="52" rx="14" ry="18" fill="#3b82f6" />
+                    <polygon points="170,69 174,69 172,73" fill="#3b82f6" />
+
+                    <!-- Cola de Pusheen -->
+                    <path d="M 148 110 C 168 114 185 106 182 94 C 179 84 152 94 146 102 Z" fill="${pGrey}" stroke="${pDark}" stroke-width="4.5" />
+
+                    <!-- Cuerpo gordo -->
+                    <path d="M 45 100 C 38 65 158 65 152 100 C 150 128 125 136 98 136 C 71 136 47 128 45 100 Z" fill="${pGrey}" stroke="${pDark}" stroke-width="5" />
+
+                    <!-- Gorrito de cumpleaños entre las orejas -->
+                    <polygon points="88,60 108,60 98,24" fill="#a855f7" stroke="${pDark}" stroke-width="3.5" stroke-linejoin="round" />
+                    <circle cx="98" cy="20" r="4.5" fill="#f472b6" />
+                    <path d="M 91,48 L 105,44" stroke="white" stroke-width="2" />
+                    <path d="M 94,36 L 102,33" stroke="white" stroke-width="2" />
+
+                    <!-- Orejas reales -->
+                    <path d="M 58 71 C 58 60 68 52 74 65" fill="${pGrey}" stroke="${pDark}" stroke-width="5" />
+                    <path d="M 122 65 C 128 52 138 60 138 71" fill="${pGrey}" stroke="${pDark}" stroke-width="5" />
+
+                    <!-- Patitas de abajo -->
+                    <ellipse cx="68" cy="135" rx="8" ry="7" fill="${pGrey}" stroke="${pDark}" stroke-width="4.5" />
+                    <ellipse cx="128" cy="135" rx="8" ry="7" fill="${pGrey}" stroke="${pDark}" stroke-width="4.5" />
+
+                    <!-- Facciones reales tiernas -->
+                    <circle cx="78" cy="90" r="3.5" fill="${pDark}" />
+                    <circle cx="118" cy="90" r="3.5" fill="${pDark}" />
+                    <path d="M 93 93 Q 97 97 101 93 Q 105 97 109 93" fill="none" stroke="${pDark}" stroke-width="3.5" stroke-linecap="round" />
+                    <ellipse cx="70" cy="95" rx="5" ry="4" fill="${pPink}" />
+                    <ellipse cx="126" cy="95" rx="5" ry="4" fill="${pPink}" />
+
+                    <!-- Bigotes -->
+                    <line x1="33" y1="91" x2="45" y2="93" stroke="${pDark}" stroke-width="3.5" stroke-linecap="round" />
+                    <line x1="33" y1="100" x2="45" y2="98" stroke="${pDark}" stroke-width="3.5" stroke-linecap="round" />
+                    <line x1="163" y1="91" x2="151" y2="93" stroke="${pDark}" stroke-width="3.5" stroke-linecap="round" />
+                    <line x1="163" y1="100" x2="151" y2="98" stroke="${pDark}" stroke-width="3.5" stroke-linecap="round" />
+
+                    <!-- Patitas delanteras levantadas de emoción alegre -->
+                    <ellipse cx="68" cy="112" rx="7" ry="6" fill="${pGrey}" stroke="${pDark}" stroke-width="3.5" />
+                    <ellipse cx="128" cy="112" rx="7" ry="6" fill="${pGrey}" stroke="${pDark}" stroke-width="3.5" />
+                </svg>`;
+            } else {
+                // Pusheenicornio Mágico Real (Racha de 8 o superior) con cola arcoíris y cuerno dorado
+                return `
+                <svg viewBox="0 0 200 170" class="w-48 h-48 pusheen-dance" xmlns="http://www.w3.org/2000/svg">
+                    <!-- Crin de Unicornio Arcoíris (Pastel) -->
+                    <path d="M 120 45 Q 142 35 152 55 Q 145 70 128 65 Z" fill="#ffb4b4" />
+                    <path d="M 126 50 Q 146 41 154 61" stroke="#93c5fd" stroke-width="4.5" fill="none" stroke-linecap="round" />
+                    <path d="M 130 55 Q 148 48 155 66" stroke="#a7f3d0" stroke-width="4.5" fill="none" stroke-linecap="round" />
+
+                    <!-- Cuerno dorado mágico brillante de unicornio -->
+                    <polygon points="94,45 102,45 98,8" fill="#fbbf24" stroke="#d97706" stroke-width="3.5" stroke-linejoin="round" />
+                    <path d="M 96,30 L 100,26" stroke="white" stroke-width="2" />
+                    <path d="M 97,18 L 99,14" stroke="white" stroke-width="2" />
+
+                    <!-- Cola mágica de unicornio -->
+                    <path d="M 148 110 C 168 114 185 106 182 94 C 179 84 152 94 146 102 Z" fill="#ffb4b4" stroke="${pDark}" stroke-width="4.5" />
+
+                    <!-- Cuerpo gordo de Pusheen -->
+                    <path d="M 45 100 C 38 65 158 65 152 100 C 150 128 125 136 98 136 C 71 136 47 128 45 100 Z" fill="${pGrey}" stroke="${pDark}" stroke-width="5" />
+
+                    <!-- Orejas redondeadas -->
+                    <path d="M 58 71 C 58 60 68 52 74 65" fill="${pGrey}" stroke="${pDark}" stroke-width="5" />
+                    <path d="M 122 65 C 128 52 138 60 138 71" fill="${pGrey}" stroke="${pDark}" stroke-width="5" />
+
+                    <!-- Patitas cortas -->
+                    <ellipse cx="68" cy="135" rx="8" ry="7" fill="${pGrey}" stroke="${pDark}" stroke-width="4.5" />
+                    <ellipse cx="128" cy="135" rx="8" ry="7" fill="${pGrey}" stroke="${pDark}" stroke-width="4.5" />
+
+                    <!-- Facciones reales -->
+                    <circle cx="78" cy="90" r="3.5" fill="${pDark}" />
+                    <circle cx="118" cy="90" r="3.5" fill="${pDark}" />
+                    <path d="M 93 93 Q 97 97 101 93 Q 105 97 109 93" fill="none" stroke="${pDark}" stroke-width="3.5" stroke-linecap="round" />
+                    <ellipse cx="70" cy="95" rx="5" ry="4" fill="${pPink}" />
+                    <ellipse cx="126" cy="95" rx="5" ry="4" fill="${pPink}" />
+
+                    <!-- Bigotitos tiernos -->
+                    <line x1="33" y1="91" x2="45" y2="93" stroke="${pDark}" stroke-width="3.5" />
+                    <line x1="33" y1="100" x2="45" y2="98" stroke="${pDark}" stroke-width="3.5" />
+
+                    <!-- Alitas blancas de Pusheenicornio real -->
+                    <path d="M 46 80 Q 28 68 35 58 Q 48 58 48 72 Z" fill="white" stroke="${pDark}" stroke-width="3.5" />
+                    <path d="M 41 82 Q 25 76 30 68" stroke="${pDark}" stroke-width="2.5" fill="none" />
+                </svg>`;
+            }
+        }
+
+        // 🏆 ¡COMPLETACIÓN DE TODO EL CONTINENTE! Celebración máxima
+        function triggerCompletionCelebration() {
+            playSound('streak');
+
+            const total = Object.keys(countriesData).length;
+            document.getElementById('completion-countries').textContent = `${total}/${total}`;
+            document.getElementById('completion-best-streak').textContent = gameState.bestStreak;
+            document.getElementById('completion-stars').textContent = gameState.score;
+            document.getElementById('completion-no-hint').textContent = gameState.learnedNoHint;
+            document.getElementById('completion-with-hint').textContent = gameState.learnedWithHint;
+            document.getElementById('completion-pusheen-container').innerHTML = getPusheenSVG(8); // Pusheenicornio
+
+            document.getElementById('completion-modal').classList.remove('hidden');
+
+            // Lluvia de confeti continua durante varios segundos
+            triggerConfetti();
+            setTimeout(triggerConfetti, 700);
+            setTimeout(triggerConfetti, 1400);
+            setTimeout(triggerConfetti, 2200);
+            setTimeout(triggerConfetti, 3000);
+            setTimeout(playSound.bind(null, 'streak'), 1200);
+            setTimeout(playSound.bind(null, 'streak'), 2400);
+
+            speak("¡Maite! ¡Completaste todo el continente americano! Eres una verdadera experta de la geografía. ¡Eres la mejor!");
+            document.getElementById('tuki-speech').textContent = "🎊 ¡Maite, dominaste TODA América! 🎊 Sos una experta — apretá el botón para volver a jugar desde cero.";
+        }
+
+        function restartAfterCompletion() {
+            document.getElementById('completion-modal').classList.add('hidden');
+            resetGame();
+        }
+
+        function triggerPusheenCelebration(streak) {
+            playSound('streak');
+
+            const title = document.getElementById('pusheen-congrats-title');
+            const subtitle = document.getElementById('pusheen-congrats-subtitle');
+            const badge = document.getElementById('pusheen-streak-badge');
+            const quote = document.getElementById('pusheen-fun-quote');
+            const container = document.getElementById('pusheen-svg-container');
+
+            // Inyectar el Pusheen SVG correspondiente
+            container.innerHTML = getPusheenSVG(streak);
+
+            if (streak === 3) {
+                title.textContent = "¡Racha de 3!";
+                subtitle.textContent = "¡Pusheen está comiendo galletas de felicidad!";
+                badge.textContent = "🍪 ¡Racha Galletera lograda! 🍪";
+                quote.textContent = '"¡Tus conocimientos son tan dulces como las chispas de chocolate!"';
+                speak("¡Súper racha de tres aciertos! Mira a Pusheen comiendo su galleta.");
+            } else if (streak === 5) {
+                title.textContent = "¡Racha de 5!";
+                subtitle.textContent = "¡Pusheen armó una fiesta sorpresa!";
+                badge.textContent = "🎈 ¡Racha Fiestera! 🎈";
+                quote.textContent = '"¡Maite, eres oficialmente la reina de la geografía del mapa!"';
+                speak("¡Cinco aciertos seguidos, Maite! Pusheen está bailando con globos de felicidad para celebrar contigo.");
+            } else {
+                title.textContent = `¡Racha de ${streak}!`;
+                subtitle.textContent = "¡Has despertado al unicornio geográfico!";
+                badge.textContent = "🦄 ¡Racha Mágica de Leyenda! 🦄";
+                quote.textContent = '"¡Pusheen vuela por el cielo de América para saludarte!"';
+                speak(`¡Increíble racha mágica de ${streak} aciertos! Te has convertido en una súper exploradora legendaria.`);
+            }
+
+            // Mostrar modal con transición limpia
+            const modal = document.getElementById('pusheen-modal');
+            modal.classList.remove('hidden');
+
+            // Lanzar lluvias de confeti
+            triggerConfetti();
+        }
+
+        function closePusheenModal() {
+            document.getElementById('pusheen-modal').classList.add('hidden');
+
+            // Regresar la cámara al mapa de toda América y dar paso al siguiente objetivo
+            autoZoomOutAndNext();
+        }
+
+        // Lluvia de confeti de colores con círculos y estrellas en pantalla
+        function triggerConfetti() {
+            const canvas = document.createElement('canvas');
+            canvas.style.position = 'fixed';
+            canvas.style.inset = '0';
+            canvas.style.pointerEvents = 'none';
+            canvas.style.zIndex = '99999';
+            document.body.appendChild(canvas);
+
+            const ctx = canvas.getContext('2d');
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+
+            let particles = [];
+            const colors = ['#f472b6', '#ec4899', '#a855f7', '#60a5fa', '#fde047', '#34d399'];
+
+            for (let i = 0; i < 100; i++) {
+                particles.push({
+                    x: Math.random() * canvas.width,
+                    y: -15,
+                    size: Math.random() * 8 + 6,
+                    color: colors[Math.floor(Math.random() * colors.length)],
+                    speedX: Math.random() * 6 - 3,
+                    speedY: Math.random() * 5 + 4,
+                    rotation: Math.random() * 360,
+                    rotationSpeed: Math.random() * 8 - 4
+                });
+            }
+
+            function animate() {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                let alive = false;
+
+                particles.forEach(p => {
+                    p.y += p.speedY;
+                    p.x += p.speedX;
+                    p.rotation += p.rotationSpeed;
+
+                    if (p.y < canvas.height) {
+                        alive = true;
+                        ctx.save();
+                        ctx.translate(p.x, p.y);
+                        ctx.rotate((p.rotation * Math.PI) / 180);
+                        ctx.fillStyle = p.color;
+                        ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size);
+                        ctx.restore();
+                    }
+                });
+
+                if (alive) {
+                    requestAnimationFrame(animate);
+                } else {
+                    document.body.removeChild(canvas);
+                }
+            }
+
+            animate();
+        }
+
+        function confirmReset() {
+            if (gameState.isWaiting) return;
+            document.getElementById('confirm-modal').classList.remove('hidden');
+        }
+
+        function closeConfirmModal() {
+            document.getElementById('confirm-modal').classList.add('hidden');
+        }
+
+        function resetGame() {
+            closeConfirmModal();
+            gameState.score = 0;
+            gameState.streak = 0;
+            gameState.bestStreak = 0;
+            gameState.findTries = 0;
+            gameState.isWaiting = false;
+            gameState.guessed.clear();
+            gameState.learnedNoHint = 0;
+            gameState.learnedWithHint = 0;
+            gameState.usedHintThisQuestion = false;
+            updateHintCounters();
+
+            document.getElementById('score-counter').textContent = "0";
+            document.getElementById('find-streak').textContent = "0";
+            document.getElementById('best-streak').textContent = "0";
+            document.getElementById('find-tries').textContent = "0";
+
+            clearTemporaryMarkers();
+            clearAllPermanentMarkers();
+            updatePusheenStatus(0);
+            updateProgressCounter();
+
+            // Re-pintar el GeoJSON con colores originales por región
+            if (geojsonCache) renderGeoJsonBorders();
+
+            // Centrar mapa
+            map.flyTo([12.0, -80.0], 3, { animate: true, duration: 1.2 });
+            speak("¡Juego reiniciado, Maite! Vamos a empezar de nuevo la búsqueda por América.");
+            document.getElementById('tuki-speech').textContent = "¡Juego reiniciado! Toda la racha de búsqueda vuelve a comenzar.";
+
+            setupNewFindTarget();
+        }
+
+        // Cargar todo al inicio del juego
+        window.onload = function() {
+            initRealMap();
+            updateProgressCounter();
+            updateHintCounters();
+            setupNewFindTarget();
+
+            setTimeout(() => {
+                speak("¡Hola Maite! Prepárate para el reto de buscar países en América. ¡Pusheen te acompañará en cada racha!");
+            }, 1200);
+        };
+
+        // Reajustar el mapa cuando cambia el tamaño del viewport (rotación iPad, etc.)
+        function refreshMapSize() {
+            if (map) map.invalidateSize();
+        }
+        window.addEventListener('resize', refreshMapSize);
+        window.addEventListener('orientationchange', () => setTimeout(refreshMapSize, 250));
+    </script>
+</body>
+</html>
